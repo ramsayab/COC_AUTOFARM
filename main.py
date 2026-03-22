@@ -9,6 +9,7 @@ import cv2
 import pandas as pd
 import ctypes
 import pydirectinput as pyin
+from random import choice
 
 classes = pd.read_csv("data/classes.txt", header=None)[0].to_list()
 model = YOLO("runs/detect/train/weights/best.pt")
@@ -17,7 +18,7 @@ shortcut_path = "C:/Users/User/Desktop/Clash of Clans.lnk"
 print("Membuka Clash of Clans via Google Play Games PC...")
 try:
     os.startfile(shortcut_path)
-    time.sleep(20)
+    time.sleep(5)
 except FileNotFoundError:
     print(f"Error: Shortcut tidak ditemukan di {shortcut_path}")
     exit()
@@ -46,38 +47,39 @@ else:
 
     # 4. Mulai Merekam (Di sini kamu bisa sisipkan model YOLO-mu)
     print("Tekan 'q' pada jendela deteksi untuk berhenti.")
-    while True:
-        screenshot = sct.grab(monitor)
-        img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGRA2BGR)
 
-        result = model(img, conf=0.5, save=True)
+    # while True:
+    screenshot = sct.grab(monitor)
+    img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGRA2BGR)
 
-        for r in result:
-            for box in r.boxes:
-                cls = int(box.cls[0])
-                conf = float(box.conf[0])
+    result = model(img, conf=0.5)
 
-                if classes[cls] != "air_defense": continue
-                if conf < 0.7: continue
+    for r in result:
+        for box in r.boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
 
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                cx = monitor["left"] + ((x1 + x2) / 2)
-                cy = monitor["top"] + ((y1 + y2) / 2)
+            if classes[cls] != "air_defense": continue
+            if conf < 0.7: continue
 
-                pyin.press("a")
-                time.sleep(1)
-                for each in range(3):
-                    pyin.click(x=int(cx), y=int(cy))
-                    time.sleep(0.2)
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            cx = int( monitor["left"] + ((x1 + x2) / 2) )
+            cy = int( monitor["top"] + ((y1 + y2) / 2) )
 
-                print(f"\n\nclass: {classes[cls]}, conf: {conf:.2f}")
-                print(f"center: ({cx}, {cy})")
+            pyin.press("a")
+            time.sleep(choice( np.arange(0, 0.5, 1) ))
+            for each in range(3):
+                pyin.click(x= cx+choice(np.arange(2, 14, 1)), y= cy+choice(np.arange(1, 9, 1)))
+                time.sleep(choice( np.arange(0.1, 0.5, 0.1) ))
+
+            print(f"\n\nclass: {classes[cls]}, conf: {conf:.2f}")
+            print(f"center: ({cx}, {cy})")
 
 
-        if ctypes.windll.user32.GetAsyncKeyState(0x20) !=0:
-            print("quit games...")
-            break
+    # if ctypes.windll.user32.GetAsyncKeyState(0x20) !=0:
+    #     print("quit games...")
+    #     break
 
         time.sleep(1)
-
+    
 
