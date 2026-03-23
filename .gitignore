@@ -1,5 +1,4 @@
 data/
 runs/
 testing.py
-*.pt
 note_test.ipynb
