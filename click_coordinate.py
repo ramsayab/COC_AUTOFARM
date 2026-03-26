@@ -30,3 +30,4 @@ with mouse.Listener(on_click=on_click) as listener:
     print("Click anywhere inside the game window...")
     listener.join()
 
+# abs_x1, abs_y1, abs_x2, abs_y2
