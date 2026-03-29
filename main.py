@@ -9,29 +9,28 @@ import cv2
 import pandas as pd
 from pynput import keyboard
 import pydirectinput as pyin
-import pytesseract
 from random import choice, sample, randint, uniform
 
 
 shortcut_path = "C:/Users/User/Desktop/Clash of Clans.lnk" 
 deploy_type = 2    # 1. random place one side 2. random place everyside
-troops = [3, [10, 10, 10] ]    # [how many unique troops, [each quantity] ] --> eg; 10 e-drag & 4 baloon [2, [10, 4]] - this mean your e-drag shortcut is 1 and ballon is 2
+troops = 3    # how many unique troops (not accurate if > 5)
 spell_shortcut = "a"     # Just work on Lightning spell
 
 enemy_resource_minimum = 1500000   # Minimum Enemy resource (gold and Elxir)
 wall_upgrade = 20000000   # How much resource until upgrade wall
 
-
+# position
 green_zone = {
 "top_left": [(1039, 164), (339, 654)],
 "top_right": [(1548, 67), (2410, 711)],
 "bot_left": [(296, 728), (904, 1214)],
 "bot_right": [(2424, 722), (1779, 1210)] }
 
-# --- TESSERACT PATH ---
-base = os.path.join(os.getcwd(), "Tesseract")
-pytesseract.pytesseract.tesseract_cmd = os.path.join(base, "tesseract.exe")
-os.environ["TESSDATA_PREFIX"] = os.path.join(base, "tessdata")
+mygold = (2280, 100, 2507, 149)
+myelixir = (2280, 211, 2507, 260)
+enemygold = (198, 215, 421, 259)
+enemyelixir = (198, 275, 421, 321)
 
 
 print("Opening COC...")
@@ -57,18 +56,58 @@ else:
 # --- CONFIG ---
 TESS_CONFIG = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
 # --- OCR FUNCTION ---
-def read_resource_number(gray_img, position, thresh=200):
+def read_number(gray_img, position, thresh):
+    detected_digits = []
+
     x1, y1, x2, y2 = position
     crop = gray_img[y1:y2, x1:x2]
-    _, binary = cv2.threshold(crop, thresh, 255, cv2.THRESH_BINARY)
-    text = pytesseract.image_to_string(binary, config=TESS_CONFIG)
-    digits = ''.join(filter(str.isdigit, text))
-    return int(digits) if digits else 0
+    h_crop, w_crop = crop.shape
+
+    _, crop_thresh = cv2.threshold(crop, thresh, 255, cv2.THRESH_BINARY)
+
+    for tem in os.listdir("template/number/"):
+        digit_value = tem.split(".")[0]
+        template = cv2.imread(f"template/number/{tem}", 0)
+
+        for scale in np.linspace(0.6, 1.0, 6): # Scaling from 20 - 100 %
+            w_temp = int(template.shape[1] * scale)
+            h_temp = int(template.shape[0] * scale)
+            if h_temp > h_crop or w_temp > w_crop or h_temp == 0 or w_temp == 0: # skip if template_size > img
+                continue
+
+            resized_template = cv2.resize(template, (w_temp, h_temp))
+            match = cv2.matchTemplate(crop_thresh, resized_template, cv2.TM_CCOEFF_NORMED)
+
+            loc = np.where(match >= 0.8)
+            for x, y in zip(loc[1], loc[0]):
+                score = match[y, x]
+                detected_digits.append({
+                    "x": int(x),
+                    "width": int(w_temp),
+                    "number": digit_value, 
+                    "confidence": float(score) })
+    
+    if not detected_digits: return 0
+    detected_digits.sort(key=lambda d: d["confidence"], reverse=True) # Sort based on Score
+
+    final_digits = []
+    for d in detected_digits:
+        overlap = False
+        for f in final_digits:
+            if abs(d["x"] - f["x"]) < max(d["width"], f["width"]) * 0.5:
+                overlap = True
+                break
+        if not overlap:
+            final_digits.append(d)
+
+    final_digits.sort(key=lambda d: d["x"])
+    final_digits = int("".join([d["number"] for d in final_digits]))
+    return final_digits if final_digits else 0
 
 # find wall upgrade text in bulding list
 def find_wall_text_coor(gray_img):
     _, binary = cv2.threshold(gray_img, 200, 255, cv2.THRESH_BINARY)
-    template = cv2.imread("model/wall_text.png", 0)
+    template = cv2.imread("template/wall_text.png", 0)
     _, template_bin = cv2.threshold(template, 200, 255, cv2.THRESH_BINARY)
     res = cv2.matchTemplate(binary, template_bin, cv2.TM_CCOEFF_NORMED)
     y, x = np.where(res >= 0.7)
@@ -82,9 +121,8 @@ def deploy_troops_type(type):
     else:
         coor = []
         for key in list(green_zone):
-            avg = int( sum(troops[1]) / len(green_zone.keys()) )
             x, y = np.linspace( green_zone[key][0][0], green_zone[key][-1][0], 10 ).astype(int), np.linspace( green_zone[key][0][1], green_zone[key][-1][1], 10 ).astype(int)
-            coor.append(sample( list(zip(x, y)), avg) )
+            coor.append(sample( list(zip(x, y)), 6) )
         return [row for rows in coor for row in rows]
 
 def get_gray_ss(monitor):
@@ -109,8 +147,9 @@ def get_match_template_coor(img, template, method): # didnt return window relati
     else: return 0
 
 def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
-    gold_value = read_resource_number(gray_img, (2280, 100, 2507, 149), thresh=220)
-    elixir_value = read_resource_number(gray_img, (2280, 211, 2507, 260), thresh=200)
+
+    gold_value = read_number(gray_img, mygold, 210)
+    elixir_value = read_number(gray_img, myelixir, 200)
     time.sleep(0.5)
     if (gold_value > upgrade_min_resource) or (elixir_value > upgrade_min_resource):
         while (gold_value > save_resource) or (elixir_value > save_resource):
@@ -137,12 +176,12 @@ def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
                     pyin.mouseUp()
             time.sleep(1)
             gray_img = get_gray_ss(monitor)
-            gold_value = read_resource_number(gray_img, (2280, 100, 2507, 149))
-            elixir_value = read_resource_number(gray_img, (2280, 211, 2507, 260))
+            gold_value = read_number(gray_img, mygold, 210)
+            elixir_value = read_number(gray_img, myelixir, 200)
 
 
-classes = pd.read_csv("data/classes.txt", header=None)[0].to_list()
-model = YOLO("model/best.pt")
+classes = pd.read_csv("template/classes.txt", header=None)[0].to_list()
+model = YOLO("template/best.pt")
 run = True
 def stop(key):
     global run
@@ -159,7 +198,7 @@ while run:
     if lobby:
         time.sleep(1) # If there's an event or star bonus confirmation
         img = get_bgr_ss(monitor)
-        template_bonus = cv2.imread("model/star_bonus.png")
+        template_bonus = cv2.imread("template/star_bonus.png")
         coor = get_match_template_coor(img, template_bonus, cv2.TM_CCOEFF_NORMED)
         if coor: click_adapt(coordinate=coor, randomness=2, sleep_between=(1, 1.3))
 
@@ -167,7 +206,7 @@ while run:
         auto_upgrade_wall(gray_img=gray_img, save_resource=10000000, upgrade_min_resource=wall_upgrade)  
 
         img = get_bgr_ss(monitor)  # finding attack btn and click it
-        template_atk = cv2.imread("model/attack_btn_lobby.png")
+        template_atk = cv2.imread("template/attack_btn_lobby.png")
         coor = get_match_template_coor(img, template_atk, cv2.TM_CCOEFF_NORMED)
         if coor:
             click_adapt(coordinate=coor, randomness=5, sleep_between=(0.5, 0.7)) # first attk button
@@ -186,7 +225,7 @@ while run:
         result = model(img, conf=0.6)
         if len(result[0].boxes) != 0:
             grey_img = get_gray_ss(monitor)
-            current_enemy_resource_sum = read_resource_number(grey_img, (198, 215, 421, 259), thresh=225) + read_resource_number(grey_img, (198, 275, 421, 321), thresh=225) # gold & elixir enemy read
+            current_enemy_resource_sum = read_number(grey_img, enemygold, 220) + read_number(grey_img, enemyelixir, 220) # gold & elixir enemy read
             if current_enemy_resource_sum > enemy_resource_minimum:
                 temp = f"{current_enemy_resource_sum:,}".replace(",", ".")
                 print(f"enemy resource total: {temp}, Start Attacking..")
@@ -205,21 +244,26 @@ while run:
                         else: continue
 
                 coor_troops_drop = deploy_troops_type(deploy_type) ## troops deploy
-                for type in range(troops[0]):
-                    pyin.press(f"{type+1}")
+
+                for shortcut in range(troops):
+                    gray_img = get_gray_ss(monitor)
+                    offx1, offx2= 160 * shortcut, 155 * shortcut
+                    crop = (470+offx1 , 1274, 609 + offx2, 1307)
+
+                    pyin.press(f"{shortcut + 1}")
                     time.sleep(0.4)
-                    for num in range(troops[1][type]):
-                        click_adapt(coordinate=choice(coor_troops_drop), randomness=1, sleep_between=(0.2, 0.4))
+                    for _ in range(read_number(gray_img, crop, 200)):
+                        click_adapt(coordinate=choice(coor_troops_drop), randomness=1, sleep_between=(0.1, 0.2))
 
                 for hero in ['q', 'w', 'e', 'r', 'z']: # hero deploy
                     pyin.press(hero)
-                    click_adapt(coordinate=choice(coor_troops_drop), randomness=1, sleep_between=(0.3, 0.5))
+                    click_adapt(coordinate=choice(coor_troops_drop), randomness=1, sleep_between=(0.2, 0.3))
 
                 attack_mode = False  # atck END
             else:
                 temp = f"{current_enemy_resource_sum:,}".replace(",", ".")
                 print(f"resource to little: {temp}\nskipping..")
-                template_next = cv2.imread("model/next_btn.png")
+                template_next = cv2.imread("template/next_btn.png")
                 coor = get_match_template_coor(img, template_next, cv2.TM_CCOEFF_NORMED)
                 if coor:
                     click_adapt(coordinate=coor, randomness=15, sleep_between=(0.7 ,1))
@@ -231,7 +275,7 @@ while run:
 
     if not lobby:
         img = get_bgr_ss(monitor)
-        template_return = cv2.imread("model/return_home.png")
+        template_return = cv2.imread("template/return_home.png")
         coor = get_match_template_coor(img, template_return, cv2.TM_CCOEFF_NORMED)
         if coor:
             click_adapt(coordinate=coor, randomness=5, sleep_between=(2, 3))

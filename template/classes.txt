@@ -1,0 +1,13 @@
+air_defense
+air_sweeper
+archer_tower
+dark_elixir_storage
+eagle_artillery
+elixir_storage
+gold_storage
+inferno
+monolith
+scattershot
+town_hall
+wizard_tower
+x_bow
