@@ -32,6 +32,7 @@ myelixir = (2280, 211, 2507, 260)
 enemygold = (198, 215, 421, 259)
 enemyelixir = (198, 275, 421, 321)
 
+troops_coor_number = [(471, 1274, 609, 1307), (630, 1274, 761, 1307), (792, 1274, 918, 1307), (959, 1274, 1076, 1307), (1131, 1274, 1255, 1307)]
 
 print("Opening COC...")
 os.startfile(shortcut_path)
@@ -53,8 +54,6 @@ else:
         "height": windows.height
     }
 
-# --- CONFIG ---
-TESS_CONFIG = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
 # --- OCR FUNCTION ---
 def read_number(gray_img, position, thresh):
     detected_digits = []
@@ -63,13 +62,14 @@ def read_number(gray_img, position, thresh):
     crop = gray_img[y1:y2, x1:x2]
     h_crop, w_crop = crop.shape
 
+    
     _, crop_thresh = cv2.threshold(crop, thresh, 255, cv2.THRESH_BINARY)
+    cv2.imwrite("debug_crop_thresh.png", crop_thresh)
 
     for tem in os.listdir("template/number/"):
         digit_value = tem.split(".")[0]
         template = cv2.imread(f"template/number/{tem}", 0)
-
-        for scale in np.linspace(0.6, 1.0, 6): # Scaling from 20 - 100 %
+        for scale in np.linspace(0.2, 1.0, 16): # Scaling from 20 - 100 %
             w_temp = int(template.shape[1] * scale)
             h_temp = int(template.shape[0] * scale)
             if h_temp > h_crop or w_temp > w_crop or h_temp == 0 or w_temp == 0: # skip if template_size > img
@@ -78,7 +78,7 @@ def read_number(gray_img, position, thresh):
             resized_template = cv2.resize(template, (w_temp, h_temp))
             match = cv2.matchTemplate(crop_thresh, resized_template, cv2.TM_CCOEFF_NORMED)
 
-            loc = np.where(match >= 0.8)
+            loc = np.where(match >= 0.75)
             for x, y in zip(loc[1], loc[0]):
                 score = match[y, x]
                 detected_digits.append({
@@ -148,12 +148,13 @@ def get_match_template_coor(img, template, method): # didnt return window relati
 
 def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
 
-    gold_value = read_number(gray_img, mygold, 210)
+    gold_value = read_number(gray_img, mygold, 230)
     elixir_value = read_number(gray_img, myelixir, 200)
+    print(f"current resource:\ngold:{gold_value}, elixir:{elixir_value}")
     time.sleep(0.5)
     if (gold_value > upgrade_min_resource) or (elixir_value > upgrade_min_resource):
         while (gold_value > save_resource) or (elixir_value > save_resource):
-            click_adapt(coordinate=(1303, 119), randomness=3) # builder click
+            click_adapt(coordinate=(1303, 119), randomness=1) # builder click
             for _ in range(5):
                 time.sleep(1.5)
                 gray_img = get_gray_ss(monitor)
@@ -161,11 +162,11 @@ def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
                 if len(x) != 0:
                     click_adapt(coordinate=(x[0], y[0]), randomness=1, offset=(40, 30)) #wall click
                     if gold_value > elixir_value:
-                        click_adapt(coordinate=(1561, 1190), randomness=5, sleep_between=(0.5, 0.8))
+                        click_adapt(coordinate=(1561, 1190), randomness=1, sleep_between=(0.5, 0.8))
                     else:
-                        click_adapt(coordinate=(1774, 1190), randomness=5, sleep_between=(0.5, 0.8))
+                        click_adapt(coordinate=(1774, 1190), randomness=1, sleep_between=(0.5, 0.8))
                     
-                    click_adapt(coordinate=(1860, 1280), randomness=6)   # confirm upgrade click
+                    click_adapt(coordinate=(1860, 1280), randomness=2)   # confirm upgrade click
                     break
                 else:
                     pyin.moveTo(1400 + monitor["left"], 900 + monitor["top"])
@@ -206,12 +207,33 @@ while run:
         auto_upgrade_wall(gray_img=gray_img, save_resource=10000000, upgrade_min_resource=wall_upgrade)  
 
         img = get_bgr_ss(monitor)  # finding attack btn and click it
-        template_atk = cv2.imread("template/attack_btn_lobby.png")
-        coor = get_match_template_coor(img, template_atk, cv2.TM_CCOEFF_NORMED)
-        if coor:
-            click_adapt(coordinate=coor, randomness=5, sleep_between=(0.5, 0.7)) # first attk button
+        template_atk_1 = cv2.imread("template/attack_btn_lobby.png")
+        atk_btn_1 = get_match_template_coor(img, template_atk_1, cv2.TM_CCOEFF_NORMED)
+        if atk_btn_1:
+            click_adapt(coordinate=atk_btn_1, randomness=5, sleep_between=(0.5, 0.7)) # first attk button
+
+            time.sleep(1)
+            template_atk_2 = cv2.imread("template/attack_btn_2.png")
+            img = get_bgr_ss(monitor)
+            atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
+            while not atk_btn_2:
+                print("attack button 2 not found..")
+                time.sleep(1)
+                img = get_bgr_ss(monitor)
+                atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
             click_adapt(coordinate=(442, 1029), randomness=10, sleep_between=(0.5, 0.7)) # find match btn
+
+            template_atk_3 = cv2.imread("template/attack_btn_3.png")
+            img = get_bgr_ss(monitor)
+            atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
+            while not atk_btn_3:
+                print("attack button 3 not found..")
+                time.sleep(1)
+                img = get_bgr_ss(monitor)
+                atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
             click_adapt(coordinate=(2210, 1265), randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
+
+
             lobby = False
             attack_mode = True
             time.sleep(2)
@@ -225,7 +247,7 @@ while run:
         result = model(img, conf=0.6)
         if len(result[0].boxes) != 0:
             grey_img = get_gray_ss(monitor)
-            current_enemy_resource_sum = read_number(grey_img, enemygold, 220) + read_number(grey_img, enemyelixir, 220) # gold & elixir enemy read
+            current_enemy_resource_sum = read_number(grey_img, enemygold, 230) + read_number(grey_img, enemyelixir, 230) # gold & elixir enemy read
             if current_enemy_resource_sum > enemy_resource_minimum:
                 temp = f"{current_enemy_resource_sum:,}".replace(",", ".")
                 print(f"enemy resource total: {temp}, Start Attacking..")
@@ -247,8 +269,7 @@ while run:
 
                 for shortcut in range(troops):
                     gray_img = get_gray_ss(monitor)
-                    offx1, offx2= 160 * shortcut, 155 * shortcut
-                    crop = (470+offx1 , 1274, 609 + offx2, 1307)
+                    crop = troops_coor_number[shortcut]
 
                     pyin.press(f"{shortcut + 1}")
                     time.sleep(0.4)
