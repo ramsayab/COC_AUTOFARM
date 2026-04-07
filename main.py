@@ -12,7 +12,7 @@ import pydirectinput as pyin
 from random import choice, sample, randint, uniform
 
 
-shortcut_path = "C:/Users/ramsa/OneDrive/Desktop/Clash of Clans.lnk" 
+shortcut_path = "C:/Users/user/Desktop/Clash of Clans.lnk" 
 deploy_type = 2    # 1. random place one side 2. random place everyside
 troops = 2    # how many unique troops (not accurate if > 5)
 spell_shortcut = "a"     # Just work on Lightning spell
@@ -36,23 +36,24 @@ troops_coor_number = [(234, 692, 293, 722), (326, 692, 376, 722), (413, 692, 462
 
 print("Opening COC...")
 os.startfile(shortcut_path)
-time.sleep(4)
 
 # Cari jendela game CoC
+while not gw.getWindowsWithTitle("Clash of Clans"):
+    print("opening COC..")
+    time.sleep(1)
+    
 windows = gw.getWindowsWithTitle("Clash of Clans")[0]
-if not windows:
-    print(f"Coc tidak ada.")
-else:
-    if windows.isMinimized:
-        windows.restore()
-    windows.activate()
-    sct = mss.mss()
-    monitor = {
-        "left": windows.left,
-        "top": windows.top,
-        "width": windows.width,
-        "height": windows.height
-    }
+
+if windows.isMinimized:
+    windows.restore()
+windows.activate()
+sct = mss.mss()
+monitor = {
+    "left": windows.left,
+    "top": windows.top,
+    "width": windows.width,
+    "height": windows.height
+}
 
 # --- OCR FUNCTION ---
 def read_number(gray_img, position, thresh):
