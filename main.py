@@ -12,9 +12,9 @@ import pydirectinput as pyin
 from random import choice, sample, randint, uniform
 
 
-shortcut_path = "C:/Users/User/Desktop/Clash of Clans.lnk" 
+shortcut_path = "C:/Users/ramsa/OneDrive/Desktop/Clash of Clans.lnk" 
 deploy_type = 2    # 1. random place one side 2. random place everyside
-troops = 3    # how many unique troops (not accurate if > 5)
+troops = 2    # how many unique troops (not accurate if > 5)
 spell_shortcut = "a"     # Just work on Lightning spell
 
 enemy_resource_minimum = 1500000   # Minimum Enemy resource (gold and Elxir)
@@ -22,21 +22,21 @@ wall_upgrade = 20000000   # How much resource until upgrade wall
 
 # position
 green_zone = {
-"top_left": [(1039, 164), (339, 654)],
-"top_right": [(1548, 67), (2410, 711)],
-"bot_left": [(296, 728), (904, 1214)],
-"bot_right": [(2424, 722), (1779, 1210)] }
+"top_left": [(626, 65), (194, 395)],
+"top_right": [(743, 55), (1187, 397)],
+"bot_left": [(184, 407), (517, 665)],
+"bot_right": [(1203, 414), (871, 667)] }
 
-mygold = (2280, 100, 2507, 149)
-myelixir = (2280, 211, 2507, 260)
-enemygold = (198, 215, 421, 259)
-enemyelixir = (198, 275, 421, 321)
+mygold = (1115, 80, 1234, 100)
+myelixir = (1115, 136, 1234, 161)
+enemygold = (150, 137, 274, 164)
+enemyelixir = (148, 172, 272, 195)
 
-troops_coor_number = [(471, 1274, 609, 1307), (630, 1274, 761, 1307), (792, 1274, 918, 1307), (959, 1274, 1076, 1307), (1131, 1274, 1255, 1307)]
+troops_coor_number = [(234, 692, 293, 722), (326, 692, 376, 722), (413, 692, 462, 722), (495, 692, 544, 722), (571, 692, 630, 722)]
 
 print("Opening COC...")
 os.startfile(shortcut_path)
-time.sleep(7)
+time.sleep(4)
 
 # Cari jendela game CoC
 windows = gw.getWindowsWithTitle("Clash of Clans")[0]
@@ -69,7 +69,7 @@ def read_number(gray_img, position, thresh):
     for tem in os.listdir("template/number/"):
         digit_value = tem.split(".")[0]
         template = cv2.imread(f"template/number/{tem}", 0)
-        for scale in np.linspace(0.2, 1.0, 16): # Scaling from 20 - 100 %
+        for scale in np.linspace(0.4, 2, 16): # Scaling from 20 - 100 %
             w_temp = int(template.shape[1] * scale)
             h_temp = int(template.shape[0] * scale)
             if h_temp > h_crop or w_temp > w_crop or h_temp == 0 or w_temp == 0: # skip if template_size > img
@@ -146,39 +146,38 @@ def get_match_template_coor(img, template, method): # didnt return window relati
         return (x, y)
     else: return 0
 
-def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
+def auto_upgrade_wall(gray_img, upgrade_min_resource):
 
     gold_value = read_number(gray_img, mygold, 230)
     elixir_value = read_number(gray_img, myelixir, 200)
     print(f"current resource:\ngold:{gold_value}, elixir:{elixir_value}")
     time.sleep(0.5)
     if (gold_value > upgrade_min_resource) or (elixir_value > upgrade_min_resource):
-        while (gold_value > save_resource) or (elixir_value > save_resource):
-            click_adapt(coordinate=(1303, 119), randomness=1) # builder click
-            for _ in range(5):
-                time.sleep(1.5)
-                gray_img = get_gray_ss(monitor)
-                x, y = find_wall_text_coor(gray_img) # wall text coordinat
-                if len(x) != 0:
-                    click_adapt(coordinate=(x[0], y[0]), randomness=1, offset=(40, 30)) #wall click
-                    if gold_value > elixir_value:
-                        click_adapt(coordinate=(1561, 1190), randomness=1, sleep_between=(0.5, 0.8))
-                    else:
-                        click_adapt(coordinate=(1774, 1190), randomness=1, sleep_between=(0.5, 0.8))
-                    
-                    click_adapt(coordinate=(1860, 1280), randomness=2)   # confirm upgrade click
-                    break
-                else:
-                    pyin.moveTo(1400 + monitor["left"], 900 + monitor["top"])
-                    pyin.mouseDown()
-                    for y in range(880, 600, -30):
-                        pyin.moveTo(1380, y + randint(5, 10))
-                        time.sleep(0.01)
-                    pyin.mouseUp()
-            time.sleep(1)
+        click_adapt(coordinate=(651, 67), randomness=1) # builder click
+        for _ in range(5):
+            time.sleep(1.5)
             gray_img = get_gray_ss(monitor)
-            gold_value = read_number(gray_img, mygold, 210)
-            elixir_value = read_number(gray_img, myelixir, 200)
+            x, y = find_wall_text_coor(gray_img) # wall text coordinat
+            if len(x) != 0:
+                click_adapt(coordinate=(x[0], y[0]), randomness=1, offset=(40, 30)) #wall click  #####
+                if gold_value > elixir_value:
+                    click_adapt(coordinate=(801, 657), randomness=1, sleep_between=(0.5, 0.8))
+                else:
+                    click_adapt(coordinate=(916, 660), randomness=1, sleep_between=(0.5, 0.8))
+                
+                click_adapt(coordinate=(960, 715), randomness=2)   # confirm upgrade click
+                break
+            else:
+                pyin.moveTo(693 + monitor["left"], 440 + monitor["top"])
+                pyin.mouseDown()
+                for y in range(420, 200, -30):
+                    pyin.moveTo(677, y + randint(5, 10))
+                    time.sleep(0.01)
+                pyin.mouseUp()
+        time.sleep(1)
+        gray_img = get_gray_ss(monitor)
+        gold_value = read_number(gray_img, mygold, 210)
+        elixir_value = read_number(gray_img, myelixir, 200)
 
 
 classes = pd.read_csv("template/classes.txt", header=None)[0].to_list()
@@ -201,10 +200,14 @@ while run:
         img = get_bgr_ss(monitor)
         template_bonus = cv2.imread("template/star_bonus.png")
         coor = get_match_template_coor(img, template_bonus, cv2.TM_CCOEFF_NORMED)
-        if coor: click_adapt(coordinate=coor, randomness=2, sleep_between=(1, 1.3))
+        if coor: click_adapt(coordinate=coor, randomness=0, sleep_between=(1, 1.3))
 
         gray_img = get_gray_ss(monitor) # wall upgrade start
-        auto_upgrade_wall(gray_img=gray_img, save_resource=10000000, upgrade_min_resource=wall_upgrade)  
+        if not read_number(gray_img, mygold, 230):
+            print("lobby not loaded..")
+            continue
+        
+        auto_upgrade_wall(gray_img=gray_img, upgrade_min_resource=wall_upgrade)  
 
         img = get_bgr_ss(monitor)  # finding attack btn and click it
         template_atk_1 = cv2.imread("template/attack_btn_lobby.png")
@@ -221,7 +224,7 @@ while run:
                 time.sleep(1)
                 img = get_bgr_ss(monitor)
                 atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
-            click_adapt(coordinate=(442, 1029), randomness=10, sleep_between=(0.5, 0.7)) # find match btn
+            click_adapt(coordinate=atk_btn_2, randomness=10, sleep_between=(0.5, 0.7)) # find match btn
 
             template_atk_3 = cv2.imread("template/attack_btn_3.png")
             img = get_bgr_ss(monitor)
@@ -231,7 +234,7 @@ while run:
                 time.sleep(1)
                 img = get_bgr_ss(monitor)
                 atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
-            click_adapt(coordinate=(2210, 1265), randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
+            click_adapt(coordinate=atk_btn_3, randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
 
 
             lobby = False
