@@ -180,8 +180,8 @@ def auto_upgrade_wall(gray_img, upgrade_min_resource):
         elixir_value = read_number(gray_img, myelixir, 200)
 
 
-classes = pd.read_csv("template/classes.txt", header=None)[0].to_list()
-model = YOLO("template/best.pt")
+classes = pd.read_csv("data/classes.txt", header=None)[0].to_list()
+model = YOLO("model/best.pt")
 run = True
 def stop(key):
     global run
