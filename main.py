@@ -5,20 +5,19 @@ import mss
 import cv2
 import numpy as np
 from ultralytics import YOLO
-import cv2
 import pandas as pd
 from pynput import keyboard
 import pydirectinput as pyin
 from random import choice, sample, randint, uniform
 
 
-shortcut_path = "C:/Users/User/Desktop/Clash of Clans.lnk" 
-deploy_type = 2    # 1. random place one side 2. random place everyside
-troops = 3    # how many unique troops (not accurate if > 5)
+shortcut_path = "C:/Users/User/Desktop/Clash of Clans.lnk" # Change to your Shortcut path
+deploy_type = 2    # 1 : random place one side,  2 : random place everyside
+troops = 2    # how many unique troops (not accurate if > 5)
 spell_shortcut = "a"     # Just work on Lightning spell
 
 enemy_resource_minimum = 1500000   # Minimum Enemy resource (gold and Elxir)
-wall_upgrade = 20000000   # How much resource until upgrade wall
+wall_upgrade = 10000000   # How much resource until upgrade wall
 
 # position
 green_zone = {
@@ -36,59 +35,82 @@ troops_coor_number = [(471, 1274, 609, 1307), (630, 1274, 761, 1307), (792, 1274
 
 print("Opening COC...")
 os.startfile(shortcut_path)
-time.sleep(7)
 
 # Cari jendela game CoC
+while not gw.getWindowsWithTitle("Clash of Clans"):
+    print("opening COC..")
+    time.sleep(1)
+    
 windows = gw.getWindowsWithTitle("Clash of Clans")[0]
-if not windows:
-    print(f"Coc tidak ada.")
-else:
-    if windows.isMinimized:
-        windows.restore()
-    windows.activate()
-    sct = mss.mss()
-    monitor = {
-        "left": windows.left,
-        "top": windows.top,
-        "width": windows.width,
-        "height": windows.height
-    }
 
-# --- OCR FUNCTION ---
-def read_number(gray_img, position, thresh):
-    detected_digits = []
+if windows.isMinimized:
+    windows.restore()
+windows.activate()
+sct = mss.mss()
+monitor = {
+    "left": windows.left,
+    "top": windows.top,
+    "width": windows.width,
+    "height": windows.height
+}
+
+def read_number(gray_img, position, thresh, thresh_min=190, thresh_step=10):
 
     x1, y1, x2, y2 = position
     crop = gray_img[y1:y2, x1:x2]
     h_crop, w_crop = crop.shape
 
-    
-    _, crop_thresh = cv2.threshold(crop, thresh, 255, cv2.THRESH_BINARY)
-    cv2.imwrite("debug_crop_thresh.png", crop_thresh)
+    current_thresh = thresh
+
+    while current_thresh >= thresh_min:
+        _, crop_thresh = cv2.threshold(crop, current_thresh, 255, cv2.THRESH_BINARY)
+
+        detected_digits = _detect_digits(crop_thresh, h_crop, w_crop)
+
+        if detected_digits:
+            return _build_number(detected_digits)
+
+        current_thresh -= thresh_step
+
+    return 0
+
+
+def _detect_digits(crop_thresh, h_crop, w_crop, match_thresh=0.75):
+    """Menjalankan template matching untuk semua template angka."""
+    detected_digits = []
 
     for tem in os.listdir("template/number/"):
         digit_value = tem.split(".")[0]
         template = cv2.imread(f"template/number/{tem}", 0)
-        for scale in np.linspace(0.2, 1.0, 16): # Scaling from 20 - 100 %
+
+        if template is None:
+            continue
+
+        for scale in np.linspace(0.2, 1.0, 16):
             w_temp = int(template.shape[1] * scale)
             h_temp = int(template.shape[0] * scale)
-            if h_temp > h_crop or w_temp > w_crop or h_temp == 0 or w_temp == 0: # skip if template_size > img
+
+            if h_temp > h_crop or w_temp > w_crop or h_temp == 0 or w_temp == 0:
                 continue
 
             resized_template = cv2.resize(template, (w_temp, h_temp))
             match = cv2.matchTemplate(crop_thresh, resized_template, cv2.TM_CCOEFF_NORMED)
 
-            loc = np.where(match >= 0.75)
+            loc = np.where(match >= match_thresh)
             for x, y in zip(loc[1], loc[0]):
                 score = match[y, x]
                 detected_digits.append({
                     "x": int(x),
                     "width": int(w_temp),
-                    "number": digit_value, 
-                    "confidence": float(score) })
-    
-    if not detected_digits: return 0
-    detected_digits.sort(key=lambda d: d["confidence"], reverse=True) # Sort based on Score
+                    "number": digit_value,
+                    "confidence": float(score)
+                })
+
+    return detected_digits
+
+
+def _build_number(detected_digits):
+    detected_digits.sort(key=lambda d: d["confidence"], reverse=True)
 
     final_digits = []
     for d in detected_digits:
@@ -101,8 +123,10 @@ def read_number(gray_img, position, thresh):
             final_digits.append(d)
 
     final_digits.sort(key=lambda d: d["x"])
-    final_digits = int("".join([d["number"] for d in final_digits]))
-    return final_digits if final_digits else 0
+    number_str = "".join([d["number"] for d in final_digits])
+
+    return int(number_str) if number_str else 0
+
 
 # find wall upgrade text in bulding list
 def find_wall_text_coor(gray_img):
@@ -146,39 +170,38 @@ def get_match_template_coor(img, template, method): # didnt return window relati
         return (x, y)
     else: return 0
 
-def auto_upgrade_wall(gray_img, save_resource, upgrade_min_resource):
+def auto_upgrade_wall(gray_img, upgrade_min_resource):
 
     gold_value = read_number(gray_img, mygold, 230)
     elixir_value = read_number(gray_img, myelixir, 200)
     print(f"current resource:\ngold:{gold_value}, elixir:{elixir_value}")
     time.sleep(0.5)
     if (gold_value > upgrade_min_resource) or (elixir_value > upgrade_min_resource):
-        while (gold_value > save_resource) or (elixir_value > save_resource):
-            click_adapt(coordinate=(1303, 119), randomness=1) # builder click
-            for _ in range(5):
-                time.sleep(1.5)
-                gray_img = get_gray_ss(monitor)
-                x, y = find_wall_text_coor(gray_img) # wall text coordinat
-                if len(x) != 0:
-                    click_adapt(coordinate=(x[0], y[0]), randomness=1, offset=(40, 30)) #wall click
-                    if gold_value > elixir_value:
-                        click_adapt(coordinate=(1561, 1190), randomness=1, sleep_between=(0.5, 0.8))
-                    else:
-                        click_adapt(coordinate=(1774, 1190), randomness=1, sleep_between=(0.5, 0.8))
-                    
-                    click_adapt(coordinate=(1860, 1280), randomness=2)   # confirm upgrade click
-                    break
-                else:
-                    pyin.moveTo(1400 + monitor["left"], 900 + monitor["top"])
-                    pyin.mouseDown()
-                    for y in range(880, 600, -30):
-                        pyin.moveTo(1380, y + randint(5, 10))
-                        time.sleep(0.01)
-                    pyin.mouseUp()
-            time.sleep(1)
+        click_adapt(coordinate=(1303, 119), randomness=1) # builder click
+        for _ in range(5):
+            time.sleep(1.5)
             gray_img = get_gray_ss(monitor)
-            gold_value = read_number(gray_img, mygold, 210)
-            elixir_value = read_number(gray_img, myelixir, 200)
+            x, y = find_wall_text_coor(gray_img) # wall text coordinat
+            if len(x) != 0:
+                click_adapt(coordinate=(x[0], y[0]), randomness=1, offset=(40, 30)) #wall click
+                if gold_value > elixir_value:
+                    click_adapt(coordinate=(1561, 1190), randomness=1, sleep_between=(0.5, 0.8))
+                else:
+                    click_adapt(coordinate=(1774, 1190), randomness=1, sleep_between=(0.5, 0.8))
+                
+                click_adapt(coordinate=(1860, 1280), randomness=2)   # confirm upgrade click
+                break
+            else:
+                pyin.moveTo(1400 + monitor["left"], 900 + monitor["top"])
+                pyin.mouseDown()
+                for y in range(880, 600, -30):
+                    pyin.moveTo(1380, y + randint(5, 10))
+                    time.sleep(0.01)
+                pyin.mouseUp()
+        time.sleep(1)
+        gray_img = get_gray_ss(monitor)
+        gold_value = read_number(gray_img, mygold, 210)
+        elixir_value = read_number(gray_img, myelixir, 200)
 
 
 classes = pd.read_csv("template/classes.txt", header=None)[0].to_list()
@@ -204,7 +227,7 @@ while run:
         if coor: click_adapt(coordinate=coor, randomness=2, sleep_between=(1, 1.3))
 
         gray_img = get_gray_ss(monitor) # wall upgrade start
-        auto_upgrade_wall(gray_img=gray_img, save_resource=10000000, upgrade_min_resource=wall_upgrade)  
+        auto_upgrade_wall(gray_img=gray_img, upgrade_min_resource=wall_upgrade)  
 
         img = get_bgr_ss(monitor)  # finding attack btn and click it
         template_atk_1 = cv2.imread("template/attack_btn_lobby.png")
@@ -217,21 +240,19 @@ while run:
             img = get_bgr_ss(monitor)
             atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
             while not atk_btn_2:
-                print("attack button 2 not found..")
                 time.sleep(1)
                 img = get_bgr_ss(monitor)
                 atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
-            click_adapt(coordinate=(442, 1029), randomness=10, sleep_between=(0.5, 0.7)) # find match btn
+            click_adapt(coordinate=atk_btn_2, randomness=10, sleep_between=(0.5, 0.7)) # find match btn
 
             template_atk_3 = cv2.imread("template/attack_btn_3.png")
             img = get_bgr_ss(monitor)
             atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
             while not atk_btn_3:
-                print("attack button 3 not found..")
                 time.sleep(1)
                 img = get_bgr_ss(monitor)
                 atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
-            click_adapt(coordinate=(2210, 1265), randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
+            click_adapt(coordinate=atk_btn_3, randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
 
 
             lobby = False
@@ -273,7 +294,7 @@ while run:
 
                     pyin.press(f"{shortcut + 1}")
                     time.sleep(0.4)
-                    for _ in range(read_number(gray_img, crop, 200)):
+                    for _ in range(read_number(gray_img, crop, 230)):
                         click_adapt(coordinate=choice(coor_troops_drop), randomness=1, sleep_between=(0.1, 0.2))
 
                 for hero in ['q', 'w', 'e', 'r', 'z']: # hero deploy
