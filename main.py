@@ -21,17 +21,17 @@ wall_upgrade = 10000000   # How much resource until upgrade wall
 
 # position
 green_zone = {
-"top_left": [(1039, 164), (339, 654)],
-"top_right": [(1548, 67), (2410, 711)],
-"bot_left": [(296, 728), (904, 1214)],
-"bot_right": [(2424, 722), (1779, 1210)] }
+"top_left": [(626, 65), (194, 395)],
+"top_right": [(743, 55), (1187, 397)],
+"bot_left": [(184, 407), (517, 665)],
+"bot_right": [(1203, 414), (871, 667)] }
 
-mygold = (2280, 100, 2507, 149)
-myelixir = (2280, 211, 2507, 260)
-enemygold = (198, 215, 421, 259)
-enemyelixir = (198, 275, 421, 321)
+mygold = (1115, 80, 1234, 100)
+myelixir = (1115, 136, 1234, 161)
+enemygold = (150, 137, 274, 164)
+enemyelixir = (148, 172, 272, 195)
 
-troops_coor_number = [(471, 1274, 609, 1307), (630, 1274, 761, 1307), (792, 1274, 918, 1307), (959, 1274, 1076, 1307), (1131, 1274, 1255, 1307)]
+troops_coor_number = [(234, 692, 293, 722), (326, 692, 376, 722), (413, 692, 462, 722), (495, 692, 544, 722), (571, 692, 630, 722)]
 
 print("Opening COC...")
 os.startfile(shortcut_path)
@@ -171,6 +171,7 @@ def get_match_template_coor(img, template, method): # didnt return window relati
     else: return 0
 
 def auto_upgrade_wall(gray_img, upgrade_min_resource):
+def auto_upgrade_wall(gray_img, upgrade_min_resource):
 
     gold_value = read_number(gray_img, mygold, 230)
     elixir_value = read_number(gray_img, myelixir, 200)
@@ -204,8 +205,8 @@ def auto_upgrade_wall(gray_img, upgrade_min_resource):
         elixir_value = read_number(gray_img, myelixir, 200)
 
 
-classes = pd.read_csv("template/classes.txt", header=None)[0].to_list()
-model = YOLO("template/best.pt")
+classes = pd.read_csv("data/classes.txt", header=None)[0].to_list()
+model = YOLO("model/best.pt")
 run = True
 def stop(key):
     global run
@@ -224,7 +225,7 @@ while run:
         img = get_bgr_ss(monitor)
         template_bonus = cv2.imread("template/star_bonus.png")
         coor = get_match_template_coor(img, template_bonus, cv2.TM_CCOEFF_NORMED)
-        if coor: click_adapt(coordinate=coor, randomness=2, sleep_between=(1, 1.3))
+        if coor: click_adapt(coordinate=coor, randomness=0, sleep_between=(1, 1.3))
 
         gray_img = get_gray_ss(monitor) # wall upgrade start
         auto_upgrade_wall(gray_img=gray_img, upgrade_min_resource=wall_upgrade)  
@@ -244,6 +245,7 @@ while run:
                 img = get_bgr_ss(monitor)
                 atk_btn_2 = get_match_template_coor(img, template_atk_2, cv2.TM_CCOEFF_NORMED)
             click_adapt(coordinate=atk_btn_2, randomness=10, sleep_between=(0.5, 0.7)) # find match btn
+            click_adapt(coordinate=atk_btn_2, randomness=10, sleep_between=(0.5, 0.7)) # find match btn
 
             template_atk_3 = cv2.imread("template/attack_btn_3.png")
             img = get_bgr_ss(monitor)
@@ -252,6 +254,7 @@ while run:
                 time.sleep(1)
                 img = get_bgr_ss(monitor)
                 atk_btn_3 = get_match_template_coor(img, template_atk_3, cv2.TM_CCOEFF_NORMED)
+            click_adapt(coordinate=atk_btn_3, randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
             click_adapt(coordinate=atk_btn_3, randomness=10, sleep_between=(1, 1.2)) # confirm troops btn
 
 
