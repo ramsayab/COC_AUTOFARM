@@ -1,4 +1,4 @@
 data/
+datasets/
 runs/
-testing/
-note_test.ipynb
+.vscode
